@@ -1,6 +1,6 @@
 # Movie_database
 
-This programs allows the user to browse the complete movie database of the website IMDb. The back-end data was handled using postgreSQL while the interface was created with Tkinter.
+This programs allows the user to browse the complete movie database of the website IMDb, comprising more than 85000 movies and almost 300000 cast members. The back-end data was handled using postgreSQL while the interface was created with Tkinter.
 
 The program is structured in two tabs, the first one returns a list of all the movies matching the criteria inserted by the user. The second one does the same thing for the persons. For each tab the user can also get more details about the movie/person selected clicking the button placed at the bottom of the tab.
 
