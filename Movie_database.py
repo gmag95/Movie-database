@@ -156,47 +156,24 @@ def movie_query(parameters):
 
     sql_from="""FROM title_principals t JOIN imdb_names n ON t.imdb_name_id=n.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id"""
 
-    params=[]
-
     #this part of code puts togheter the SQL conditions based on the criteria selected in the entry boxes
 
-    blank_count=0
+    if len(str(parameters[1]))==0:
+        parameters[1]=0
+    if len(str(parameters[2]))==0:
+        parameters[2]=100
+    if len(str(parameters[4]))==0:
+        parameters[4]=1000
+    if len(str(parameters[5]))==0:
+        parameters[5]=3000
 
-    if len(parameters[0])!=0:
-        params.append(f"m.original_title ILIKE '%{parameters[0]}%'")
-        blank_count+=1
-    if len(str(parameters[1]))!=0:
-        params.append(f"m.avg_vote >= {parameters[1]}")
-        blank_count+=1
-    if len(str(parameters[2]))!=0:
-        params.append(f"m.avg_vote <= {parameters[2]}")
-        blank_count+=1
-    if len(parameters[3])!=0:
-        params.append(f"m.genre ILIKE '{parameters[3]}%'")
-        blank_count+=1
-    if len(str(parameters[4]))!=0:
-        params.append(f"m.year >= {parameters[4]}")
-        blank_count+=1
-    if len(str(parameters[5]))!=0:
-        params.append(f"m.year <= {parameters[5]}")
-        blank_count+=1
-    if len(parameters[6])!=0:
-        params.append(f"n.name ILIKE '%{parameters[6]}%'")
-        blank_count+=1
-    if len(parameters[7])!=0:
-        params.append(f"t.category ILIKE '%{parameters[7]}%'")
-        blank_count+=1
-
-    conditions=" AND ".join(params)
+    conditions="m.original_title ILIKE (%s) AND m.genre ILIKE (%s) AND n.name ILIKE (%s) AND t.category ILIKE (%s) AND m.avg_vote >= (%s) AND m.avg_vote <= (%s) AND m.year >= (%s) AND m.year <= (%s)"
 
     #the SQL query is put togheter and executed
 
-    if blank_count!=0:
-        sql = f"{sql_select} {sql_from} WHERE {conditions} {sql_orderby};"
-    else:
-        sql = f"{sql_select} {sql_from} {sql_orderby};"
+    sql = f"{sql_select} {sql_from} WHERE {conditions} {sql_orderby};"
 
-    cur.execute(sql)
+    cur.execute(sql, ("%"+parameters[0]+"%", "%"+parameters[3]+"%", "%"+parameters[6]+"%", "%"+parameters[7]+"%", parameters[1], parameters[2], parameters[4], parameters[5], ))
     movie_df = pd.DataFrame(cur.fetchall())
 
     movie_query_ins(movie_df)
@@ -289,7 +266,7 @@ def image_scraper(type, code):
             site = requests.get("https://www.imdb.com/name/"+code+"/")
             soup = bs4.BeautifulSoup(site.text,"lxml")
             link=soup.find("div", class_="image").img["src"]
-            
+        
         image = requests.get(link)
 
         opened_img=Image.open(BytesIO(image.content))
@@ -442,37 +419,25 @@ def person_query(parameters):
     sql_from="FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id"
     sql_orderby="ORDER BY moviescounter DESC LIMIT 100;"
 
-    params=[]
-
-    blank_count=0
-
     #this part of code puts togheter the SQL conditions based on the criteria selected in the entry boxes
 
-    if len(parameters[0])!=0:
-        params.append(f"n.name ILIKE '%{parameters[0]}%'")
-        blank_count+=1
-    if len(str(parameters[1]))!=0:
-        params.append(f"EXTRACT(year from n.date_of_birth) >= {parameters[1]}")
-    if len(str(parameters[2]))!=0:
-        blank_count+=1
-        params.append(f"EXTRACT(year from n.date_of_birth) <= {parameters[2]}")
-    if len(parameters[3])!=0:
-        blank_count+=1
-        params.append(f"(REGEXP_MATCH(n.place_of_birth, '\w+$'))[1] ILIKE '{parameters[3]}%'")
+    if len(str(parameters[1]))==0:
+        parameters[1]=1000
+    
+    if len(str(parameters[2]))==0:
+        parameters[2]=3000
+    
     if parameters[4]==1:
-        blank_count+=1
-        params.append(f"n.date_of_death IS NOT NULL")
+        conditions="n.name ILIKE (%s) AND EXTRACT(year from n.date_of_birth) >= (%s) AND EXTRACT(year from n.date_of_birth) <= (%s) AND (REGEXP_MATCH(n.place_of_birth, '\w+$'))[1] ILIKE (%s) AND n.date_of_death IS NOT NULL"
 
-    conditions=" AND ".join(params)
+    else:
+        conditions="n.name ILIKE (%s) AND EXTRACT(year from n.date_of_birth) >= (%s) AND EXTRACT(year from n.date_of_birth) <= (%s) AND (REGEXP_MATCH(n.place_of_birth, '\w+$'))[1] ILIKE (%s) AND n.date_of_death IS NULL"
 
     #the SQL query is put togheter and executed
 
-    if blank_count!=0:
-        sql = f"{sql_select} {sql_from} WHERE {conditions} {sql_orderby};"
-    else:
-        sql = f"{sql_select} {sql_from} {sql_orderby};"
+    sql = f"{sql_select} {sql_from} WHERE {conditions} {sql_orderby};"
 
-    cur.execute(sql)
+    cur.execute(sql, ("%"+parameters[0]+"%", parameters[1], parameters[2], "%"+parameters[3]+"%"))
     person_df = pd.DataFrame(cur.fetchall())
 
     person_query_ins(person_df)
