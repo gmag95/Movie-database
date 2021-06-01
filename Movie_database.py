@@ -295,7 +295,7 @@ def movie_det_query(title):
     sql = """
         SELECT DISTINCT m.original_title, m.year, m.avg_vote, m.votes, m.genre, m.country, m.worldwide_gross_income, m.description
         FROM title_principals t JOIN imdb_names n ON t.imdb_name_id=n.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id 
-        WHERE m.imdb_title_id = %s;
+        WHERE m.imdb_title_id = (%s);
             """
     
     cur.execute(sql, [title])
@@ -514,21 +514,26 @@ def person_det_query(title):
     sql = """SELECT DISTINCT n.name, n.date_of_birth, (REGEXP_MATCH(n.place_of_birth, '\w+$'))[1], 
         COUNT(*) OVER (PARTITION BY t.imdb_name_id) AS moviescounter, n.date_of_death, n.spouses, n.children, COUNT(*) OVER (PARTITION BY t.imdb_name_id)
         FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id
-        WHERE n.imdb_name_id=%s;
+        WHERE n.imdb_name_id=(%s);
             """
 
     #the second query grabs the highest and lowest rated movies of the selected person using a subquery for each movie
 
-    sql2= """SELECT m.year, m.original_title, m.avg_vote
-            FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
-            WHERE n.imdb_name_id=%s AND 
-            (m.imdb_title_id=(SELECT m.imdb_title_id FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id WHERE n.imdb_name_id=%s ORDER BY m.avg_vote DESC LIMIT 1) OR m.imdb_title_id=(SELECT m.imdb_title_id FROM title_principals t JOIN imdb_names n 
-            ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id WHERE n.imdb_name_id=%s ORDER BY m.avg_vote ASC LIMIT 1))
-            ORDER BY m.avg_vote DESC;"""
+    sql2= """SELECT *
+            FROM ((SELECT m.year, m.original_title, m.avg_vote
+                    FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
+                    WHERE n.imdb_name_id=(%s)
+                    ORDER BY m.avg_vote DESC LIMIT 1)
+                    UNION
+                    (SELECT m.year, m.original_title, m.avg_vote
+                    FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
+                    WHERE n.imdb_name_id=(%s)
+                    ORDER BY m.avg_vote ASC LIMIT 1)) AS u
+            ORDER BY u.avg_vote DESC;"""
     
     cur.execute(sql, [title])
     df = pd.DataFrame(cur.fetchall())
-    cur.execute(sql2, [title, title, title])
+    cur.execute(sql2, [title, title])
     df2 = pd.DataFrame(cur.fetchall())
     return df, df2
 
