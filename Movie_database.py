@@ -260,7 +260,7 @@ def image_scraper(type, code):
         if type=="movie":
             site = requests.get("https://www.imdb.com/title/"+code+"/")
             soup = bs4.BeautifulSoup(site.text,"lxml")
-            link=soup.find("div", class_="poster").img["src"]
+            link=soup.find("div", class_="ipc-media ipc-media--poster ipc-image-media-ratio--poster ipc-media--baseAlt ipc-media--poster-l ipc-poster__poster-image ipc-media__img").img["src"]
 
         else:
             site = requests.get("https://www.imdb.com/name/"+code+"/")
