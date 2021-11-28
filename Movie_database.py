@@ -146,7 +146,7 @@ def movie_query(parameters):
 
     if len(parameters[6])!=0:
         sql_select="""SELECT t.imdb_title_id, m.year, m.original_title, m.avg_vote, m.genre, n.name, t.category"""
-        sql_orderby="""ORDER BY COUNT(*) OVER (PARTITION BY t.imdb_name_id) DESC, m.year DESC LIMIT 100"""
+        sql_orderby="""ORDER BY COUNT(t.imdb_title_id) OVER (PARTITION BY t.imdb_name_id) DESC, m.year DESC LIMIT 100"""
 
     #query executed if the person name box was left blank
     
@@ -260,7 +260,7 @@ def image_scraper(type, code):
         if type=="movie":
             site = requests.get("https://www.imdb.com/title/"+code+"/")
             soup = bs4.BeautifulSoup(site.text,"lxml")
-            link=soup.find("div", class_="ipc-media ipc-media--poster ipc-image-media-ratio--poster ipc-media--baseAlt ipc-media--poster-l ipc-poster__poster-image ipc-media__img").img["src"]
+            link=soup.find("div", class_="ipc-media ipc-media--poster-27x40 ipc-image-media-ratio--poster-27x40 ipc-media--baseAlt ipc-media--poster-l ipc-poster__poster-image ipc-media__img").img["src"]
 
         else:
             site = requests.get("https://www.imdb.com/name/"+code+"/")
@@ -519,17 +519,20 @@ def person_det_query(title):
 
     #the second query grabs the highest and lowest rated movies of the selected person using a subquery for each movie
 
-    sql2= """SELECT *
-            FROM ((SELECT m.year, m.original_title, m.avg_vote
-                    FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
-                    WHERE n.imdb_name_id=(%s)
-                    ORDER BY m.avg_vote DESC LIMIT 1)
-                    UNION
-                    (SELECT m.year, m.original_title, m.avg_vote
-                    FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
-                    WHERE n.imdb_name_id=(%s)
-                    ORDER BY m.avg_vote ASC LIMIT 1)) AS u
-            ORDER BY u.avg_vote DESC;"""
+    sql2= """ WITH best_movie AS (SELECT m.year, m.original_title, m.avg_vote
+                                FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
+                                WHERE (n.imdb_name_id, m.avg_vote) in 
+                                (select n.imdb_name_id, MAX(m.avg_vote) from title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
+                                where n.imdb_name_id=(%s) group by n.imdb_name_id)
+                                LIMIT 1),
+   	          worst_movie as (SELECT m.year, m.original_title, m.avg_vote
+                                FROM title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
+                                WHERE (n.imdb_name_id, m.avg_vote) in 
+                                (select n.imdb_name_id, MIN(m.avg_vote) from title_principals t JOIN imdb_names n ON n.imdb_name_id=t.imdb_name_id JOIN imdb_movies m ON t.imdb_title_id=m.imdb_title_id
+                                where n.imdb_name_id=(%s) group by n.imdb_name_id)
+                                LIMIT 1)
+    
+    SELECT * FROM (SELECT * FROM worst_movie UNION select * from best_movie) AS s ORDER BY s.avg_vote DESC;"""
     
     cur.execute(sql, [title])
     df = pd.DataFrame(cur.fetchall())
@@ -640,7 +643,7 @@ conn = psycopg2.connect(
     host="localhost",
     database="movie_database",
     user="postgres",
-    password="imdb2021")
+    password="root")
 
 #the remaining part of the code creates the interface elements present in the two tabs
 
